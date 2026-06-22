@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  --background: #F3F5F7;
+  --foreground: #11213A;   /* deep command navy */
+  --gold: #B8860B;         /* brass / service gold */
+  --gold-light: #D4A017;
+  --olive: #5A6049;        /* field olive accent */
+  --muted: #54616F;
+  --border: #D7DEE6;
+  --card: #FFFFFF;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-olive: var(--olive);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-oswald), "Arial Narrow", system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Display headings: condensed, slightly tightened tracking for a disciplined feel */
+.font-display {
+  letter-spacing: 0.01em;
+}
+
+/* Service ribbon — gold / navy / olive campaign stripes */
+.service-stripes {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--gold) 0 14px,
+    #11213A 14px 28px,
+    var(--olive) 28px 42px
+  );
+}
+
+/* Subtle topographic grid for dark command panels */
+.command-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
