@@ -92,13 +92,11 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function BookingsTab({
   bookings: initialBookings,
-  openSlotsToday,
   today,
   role,
   otaAccess = true,
 }: {
   bookings: BookingWithSlot[]
-  openSlotsToday: number
   today: string
   role: Role
   otaAccess?: boolean
@@ -240,11 +238,11 @@ export default function BookingsTab({
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="font-display text-xl font-bold text-foreground">Bookings</h2>
+            <h2 className="font-display text-xl font-bold text-foreground uppercase tracking-wide">Ride Requests</h2>
             <p className="text-sm text-muted mt-0.5">
               {filterDate
-                ? `${filtered.length} booking${filtered.length !== 1 ? 's' : ''} on ${formatDate(filterDate)}`
-                : `${filtered.length} total booking${filtered.length !== 1 ? 's' : ''}`}
+                ? `${filtered.length} request${filtered.length !== 1 ? 's' : ''} on ${formatDate(filterDate)}`
+                : `${filtered.length} total request${filtered.length !== 1 ? 's' : ''}`}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -276,10 +274,10 @@ export default function BookingsTab({
               </p>
             </div>
           ) : (
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="bg-stone-50 border-b border-border">
-                  {['', 'Time', 'Date', 'Rider', 'Phone', 'Reason', 'Pickup → Destination', 'Status', 'Action'].map((h, hi) => (
+                  {['', 'Rider', 'Reason', 'Date', 'Time', 'From → To', 'Others Riding', 'Status', 'Action'].map((h, hi) => (
                     <th key={hi} className="text-left text-[11px] font-bold text-muted uppercase tracking-widest px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -301,14 +299,25 @@ export default function BookingsTab({
                             <ChevronToggle open={open} />
                           </button>
                         </td>
-                        <td className="px-4 py-4 text-sm font-semibold text-foreground whitespace-nowrap">{t ? formatTime(t) : '—'}</td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-semibold text-foreground">{booking.customer_name}</p>
+                          <p className="text-xs text-muted">{booking.phone}</p>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-foreground whitespace-nowrap">{booking.service}</td>
                         <td className="px-4 py-4 text-sm text-muted whitespace-nowrap">{d ? formatDate(d) : '—'}</td>
-                        <td className="px-4 py-4 text-sm font-medium text-foreground">{booking.customer_name}</td>
-                        <td className="px-4 py-4 text-sm text-muted whitespace-nowrap">{booking.phone}</td>
-                        <td className="px-4 py-4 text-sm text-muted whitespace-nowrap">{booking.service}</td>
-                        <td className="px-4 py-4 text-sm text-foreground">
-                          {booking.pickup_location || booking.destination
-                            ? `${booking.pickup_location ?? '—'} → ${booking.destination ?? '—'}`
+                        <td className="px-4 py-4 text-sm font-semibold text-foreground whitespace-nowrap">{t ? formatTime(t) : '—'}</td>
+                        <td className="px-4 py-4 text-sm text-foreground min-w-[220px]">
+                          {booking.pickup_location || booking.destination ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-foreground">{booking.pickup_location ?? '—'}</span>
+                              <span className="text-gold">→</span>
+                              <span className="text-foreground">{booking.destination ?? '—'}</span>
+                            </span>
+                          ) : <span className="text-muted">—</span>}
+                        </td>
+                        <td className="px-4 py-4 text-sm whitespace-nowrap">
+                          {booking.passengers
+                            ? <span className={booking.passengers === 'Yes' ? 'font-semibold text-foreground' : 'text-muted'}>{booking.passengers}</span>
                             : <span className="text-muted">—</span>}
                         </td>
                         <td className="px-4 py-4"><StatusBadge status={booking.status} /></td>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BookingsTab from './BookingsTab'
 import BarbersTab from './BarbersTab'
-import SlotsTab from './SlotsTab'
 import AnalyticsTab from './AnalyticsTab'
 import ServicesTab from './ServicesTab'
 import type { BookingWithSlot, Profile, Role, UserDetail, ServiceRow } from './types'
@@ -24,9 +23,6 @@ function BookingsTabIcon() {
 function BarbersTabIcon() {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
 }
-function SlotsTabIcon() {
-  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-}
 function AnalyticsTabIcon() {
   return <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 12l3-4 3 2 3-5 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.4"/></svg>
 }
@@ -36,7 +32,7 @@ function ServicesTabIcon() {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'bookings' | 'barbers' | 'slots' | 'analytics' | 'services'
+type Tab = 'bookings' | 'barbers' | 'analytics' | 'services'
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
@@ -45,7 +41,6 @@ export default function DashboardClient({
   adminName,
   role,
   allBookings,
-  openSlotsToday,
   today,
   initialBarbers,
   allUserDetails,
@@ -56,7 +51,6 @@ export default function DashboardClient({
   adminName: string | null
   role: Role
   allBookings: BookingWithSlot[]
-  openSlotsToday: number
   today: string
   initialBarbers: Profile[]
   allUserDetails: UserDetail[]
@@ -74,7 +68,6 @@ export default function DashboardClient({
     { id: 'analytics', label: 'Analytics', icon: <AnalyticsTabIcon />, masterOnly: true },
     { id: 'services',  label: 'Ride Types', icon: <ServicesTabIcon />,  masterOnly: true },
     { id: 'barbers',   label: 'Coordinators', icon: <BarbersTabIcon />, masterOnly: true },
-    { id: 'slots',     label: 'Slots',     icon: <SlotsTabIcon />,     masterOnly: true },
   ]
 
   async function handleSignOut() {
@@ -142,7 +135,6 @@ export default function DashboardClient({
         {activeTab === 'bookings' && (
           <BookingsTab
             bookings={allBookings}
-            openSlotsToday={openSlotsToday}
             today={today}
             role={role}
             otaAccess={otaAccess}
@@ -159,9 +151,6 @@ export default function DashboardClient({
             initialBarbers={initialBarbers}
             allUserDetails={allUserDetails}
           />
-        )}
-        {activeTab === 'slots' && isMaster && (
-          <SlotsTab today={today} />
         )}
       </main>
     </div>

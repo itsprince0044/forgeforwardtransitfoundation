@@ -31,13 +31,6 @@ export default async function DashboardPage() {
     .select('*, slot:slots(date, time)')
     .order('created_at', { ascending: false })
 
-  // Open slots today
-  const { count: openSlotsToday } = await supabase
-    .from('slots')
-    .select('*', { count: 'exact', head: true })
-    .eq('date', today)
-    .eq('is_booked', false)
-
   // Admin list (master uses this; admins don't see this tab)
   const { data: barbers } = await supabase
     .from('profiles')
@@ -76,7 +69,6 @@ export default async function DashboardPage() {
       adminName={profile?.full_name ?? null}
       role={role}
       allBookings={bookings ?? []}
-      openSlotsToday={openSlotsToday ?? 0}
       today={today}
       initialBarbers={barbers ?? []}
       allUserDetails={allUserDetails}

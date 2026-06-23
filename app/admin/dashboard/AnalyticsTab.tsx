@@ -75,9 +75,12 @@ export default function AnalyticsTab({ bookings }: { bookings: BookingWithSlot[]
     const inRange = (date: string | undefined, from: string, to: string) =>
       !!date && date >= from && date <= to
 
-    const daily   = bookings.filter(b => b.slot?.date === today)
-    const weekly  = bookings.filter(b => inRange(b.slot?.date, weekAgo, today))
-    const monthly = bookings.filter(b => inRange(b.slot?.date, monthStart, today))
+    // A request carries its own ride_date; fall back to a legacy slot if present.
+    const dateOf = (b: BookingWithSlot) => b.ride_date ?? b.slot?.date ?? undefined
+
+    const daily   = bookings.filter(b => dateOf(b) === today)
+    const weekly  = bookings.filter(b => inRange(dateOf(b), weekAgo, today))
+    const monthly = bookings.filter(b => inRange(dateOf(b), monthStart, today))
 
     // Count of confirmed/completed rides (rides are free, so we track rides, not revenue)
     const revenue = (list: BookingWithSlot[]) =>
