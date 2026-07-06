@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
 import type { BookingWithSlot, Role } from './types'
+import { updateRideStatus } from '../actions'
 
 function Detail({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -146,13 +146,13 @@ export default function BookingsTab({
     })
   }, [bookings, filterDate])
 
-  async function updateStatus(id: string, status: string) {
+  async function updateStatus(id: string, status: 'confirmed' | 'completed' | 'cancelled') {
     setActioning(id + ':' + status)
     setActionError(null)
-    const updateData: Record<string, unknown> = { status }
-    const { error } = await supabase.from('bookings').update(updateData).eq('id', id)
+    // Server action: updates status AND emails/texts the rider on confirm/cancel.
+    const { error } = await updateRideStatus(id, status)
     if (error) {
-      setActionError('Failed to update booking. Please try again.')
+      setActionError('Failed to update request. Please try again.')
     } else {
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b))
     }
@@ -316,9 +316,11 @@ export default function BookingsTab({
                           ) : <span className="text-muted">—</span>}
                         </td>
                         <td className="px-4 py-4 text-sm whitespace-nowrap">
-                          {booking.passengers
-                            ? <span className={booking.passengers === 'Yes' ? 'font-semibold text-foreground' : 'text-muted'}>{booking.passengers}</span>
-                            : <span className="text-muted">—</span>}
+                          {booking.passengers === 'Yes'
+                            ? <span className="font-semibold text-foreground">Yes{booking.extra_passengers?.length ? ` (${booking.extra_passengers.length})` : ''}</span>
+                            : booking.passengers
+                              ? <span className="text-muted">{booking.passengers}</span>
+                              : <span className="text-muted">—</span>}
                         </td>
                         <td className="px-4 py-4"><StatusBadge status={booking.status} /></td>
                         <td className="px-4 py-4"><ActionButtons booking={booking} /></td>
@@ -327,17 +329,37 @@ export default function BookingsTab({
                         <tr className="bg-amber-50/30 border-b border-border/50">
                           <td />
                           <td colSpan={8} className="px-4 pb-5 pt-1">
-                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm bg-white border border-border rounded-sm p-4">
-                              <Detail label="Email" value={booking.email} />
-                              <Detail label="Rider Type" value={booking.rider_type} />
-                              <Detail label="DoD ID" value={booking.dod_id} />
-                              <Detail label="Other Passengers" value={booking.passengers} />
-                              <Detail label="Pickup Location" value={booking.pickup_location} />
-                              <Detail label="Destination" value={booking.destination} />
-                              <Detail label="Special Notes" value={booking.special_notes} />
-                              <Detail label="E-Signature" value={booking.signature} />
-                              <Detail label="Agreement" value={booking.agreement ? 'Accepted' : 'Not accepted'} />
-                              <Detail label="Submitted" value={new Date(booking.created_at).toLocaleString('en-US')} />
+                            <div className="bg-white border border-border rounded-sm p-4 space-y-4">
+                              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm">
+                                <Detail label="Email" value={booking.email} />
+                                <Detail label="Rider Type" value={booking.rider_type} />
+                                <Detail label="DoD ID" value={booking.dod_id} />
+                                <Detail label="Anyone Else Riding?" value={booking.passengers} />
+                                <Detail label="Pickup Location" value={booking.pickup_location} />
+                                <Detail label="Destination" value={booking.destination} />
+                                <Detail label="Special Notes" value={booking.special_notes} />
+                                <Detail label="E-Signature" value={booking.signature} />
+                                <Detail label="Agreement" value={booking.agreement ? 'Accepted' : 'Not accepted'} />
+                                <Detail label="Submitted" value={new Date(booking.created_at).toLocaleString('en-US')} />
+                              </div>
+                              {booking.extra_passengers && booking.extra_passengers.length > 0 && (
+                                <div className="border-t border-border pt-3">
+                                  <p className="text-[11px] font-bold text-muted uppercase tracking-wide mb-2">
+                                    Additional Passengers ({booking.extra_passengers.length})
+                                  </p>
+                                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {[...booking.extra_passengers]
+                                      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                                      .map(pax => (
+                                        <div key={pax.id} className="rounded-sm border border-border bg-slate-50/60 px-3 py-2">
+                                          <p className="text-xs font-bold text-foreground">Passenger {pax.position ?? ''}</p>
+                                          <p className="text-sm text-foreground">{pax.full_name}</p>
+                                          <p className="text-xs text-muted">DoD ID: {pax.dod_id || '—'}</p>
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

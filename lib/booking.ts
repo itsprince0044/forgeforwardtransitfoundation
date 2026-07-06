@@ -1,8 +1,12 @@
-import { supabase } from './supabase'
-
 // ── Ride Requests ───────────────────────────────────────────────────────────
-// Mirrors the official Forge Forward Ride Request intake form. A request is
-// submitted directly with its own date/time — no pre-defined slot required.
+// Mirrors the official Forge Forward Ride Request intake form. The request is
+// submitted to a server route (/api/ride-request), which saves it and sends
+// the rider + coordinator notifications (email/SMS) with server-only keys.
+
+export interface AdditionalPassengerInput {
+  fullName: string
+  dodId: string
+}
 
 export interface RideRequestPayload {
   email: string
@@ -16,6 +20,7 @@ export interface RideRequestPayload {
   destination: string
   reason: string             // Reason for Transportation
   passengers: string         // 'Yes' | 'No'
+  additionalPassengers: AdditionalPassengerInput[]  // riders 2-4 (max 3)
   specialNotes?: string
   agreement: boolean         // Transportation Agreement accepted
   signature: string          // typed full name
@@ -24,25 +29,18 @@ export interface RideRequestPayload {
 export async function createRideRequest(
   payload: RideRequestPayload
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('bookings').insert({
-    slot_id: null,
-    customer_name: payload.fullName,
-    phone: payload.phone || '',
-    email: payload.email || null,
-    rider_type: payload.riderType || null,
-    dod_id: payload.dodId || null,
-    ride_date: payload.rideDate || null,
-    pickup_time: payload.pickupTime || null,
-    service: payload.reason,
-    pickup_location: payload.pickupLocation || null,
-    destination: payload.destination || null,
-    passengers: payload.passengers || null,
-    special_notes: payload.specialNotes || null,
-    agreement: payload.agreement,
-    signature: payload.signature || null,
-    amount: 0,
-    status: 'pending',
-  })
-
-  return { error: error ? error.message : null }
+  try {
+    const res = await fetch('/api/ride-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { error: data?.error ?? 'Request failed.' }
+    }
+    return { error: null }
+  } catch {
+    return { error: 'Network error. Please try again.' }
+  }
 }

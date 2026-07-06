@@ -1,6 +1,45 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase-service'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { notifyRideConfirmed, notifyRideCancelled, type NotifyBooking } from '@/lib/notify'
+
+// ── Ride Request status updates (coordinators) ───────────────────────────────
+
+/**
+ * Updates a ride request's status and notifies the rider by email + SMS when
+ * the ride is confirmed or cancelled. Requires an authenticated coordinator.
+ */
+export async function updateRideStatus(
+  id: string,
+  status: 'confirmed' | 'completed' | 'cancelled'
+): Promise<{ error: string | null }> {
+  // Auth check — only signed-in coordinators may change status
+  const authClient = await createSupabaseServerClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) return { error: 'Not authorized.' }
+
+  const supabase = createServiceClient()
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({ status })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) return { error: error.message }
+
+  // Notify the rider — never let a failed message fail the status update.
+  try {
+    const b: NotifyBooking = updated
+    if (status === 'confirmed') await notifyRideConfirmed(b)
+    else if (status === 'cancelled') await notifyRideCancelled(b)
+  } catch (e) {
+    console.error('[updateRideStatus] notification failed (status still updated):', e)
+  }
+
+  return { error: null }
+}
 
 // ── Services Management (Master only) ────────────────────────────────────────
 

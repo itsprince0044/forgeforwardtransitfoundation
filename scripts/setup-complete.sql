@@ -72,10 +72,23 @@ create table if not exists user_details (
   unique (user_id, description)
 );
 
+-- Additional passengers (riders 2-4) travelling with the main requester.
+-- Separate table keeps the bookings table lean; loaded only when needed.
+-- Max 3 rows per booking (car holds 5: driver + submitter + up to 3 extra).
+create table if not exists ride_passengers (
+  id         uuid primary key default gen_random_uuid(),
+  booking_id uuid not null references bookings(id) on delete cascade,
+  position   smallint,                 -- 2, 3, or 4
+  full_name  text not null,
+  dod_id     text,
+  created_at timestamptz not null default now()
+);
+
 
 -- ── 2. INDEXES ───────────────────────────────────────────────────────
 
 create index if not exists slots_date_idx on slots(date);
+create index if not exists ride_passengers_booking_id_idx on ride_passengers(booking_id);
 
 
 -- ── 3. EXTRA COLUMNS (idempotent — safe on existing databases) ───────
@@ -103,11 +116,12 @@ create index if not exists bookings_ride_date_idx on bookings(ride_date);
 
 -- ── 4. ROW LEVEL SECURITY ────────────────────────────────────────────
 
-alter table slots        enable row level security;
-alter table bookings     enable row level security;
-alter table services     enable row level security;
-alter table profiles     enable row level security;
-alter table user_details enable row level security;
+alter table slots           enable row level security;
+alter table bookings        enable row level security;
+alter table services        enable row level security;
+alter table profiles        enable row level security;
+alter table user_details    enable row level security;
+alter table ride_passengers enable row level security;
 
 -- Slots: anyone can read; authenticated coordinators can manage
 create policy "slots_select_all"   on slots for select using (true);
@@ -129,6 +143,11 @@ create policy "profiles_update_own"  on profiles for update using (auth.uid() = 
 
 -- user_details: coordinators can read; mutations go through service role
 create policy "user_details_select_auth" on user_details for select using (auth.role() = 'authenticated');
+
+-- ride_passengers: submitted with the request; only coordinators can read.
+-- (Inserts happen through the server's service role, which bypasses RLS.)
+create policy "ride_passengers_insert_all"   on ride_passengers for insert with check (true);
+create policy "ride_passengers_select_admin" on ride_passengers for select using (auth.role() = 'authenticated');
 
 
 -- ── 5. SEED RIDE TYPES ───────────────────────────────────────────────

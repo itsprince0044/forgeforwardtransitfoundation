@@ -28,6 +28,15 @@ export interface Booking {
   slot?: Slot
 }
 
+export interface RidePassenger {
+  id: string
+  booking_id: string
+  position?: number      // 2, 3, or 4
+  full_name: string
+  dod_id?: string
+  created_at?: string
+}
+
 export interface Service {
   id: string
   name: string

@@ -14,6 +14,7 @@ export type BookingWithSlot = {
   pickup_location?: string | null
   destination?: string | null
   passengers?: string | null         // Will anyone else ride? Yes / No
+  extra_passengers?: { id: string; position: number | null; full_name: string; dod_id: string | null }[]
   special_notes?: string | null
   agreement?: boolean | null
   signature?: string | null          // Electronic Signature

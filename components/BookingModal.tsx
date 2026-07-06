@@ -46,6 +46,9 @@ function formatTime(t: string): string {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const DOD_ID_RE = /^\d{10}$/                       // DoD ID / EDIPI is exactly 10 digits
+const NAME_RE = /^[A-Za-z][A-Za-z .'-]*$/          // must start with a letter; no numbers
+const onlyDigits = (v: string, max: number) => v.replace(/\D/g, '').slice(0, max)
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -135,6 +138,10 @@ function StepIndicator({ step }: { step: Step }) {
 
 // ── Form state ─────────────────────────────────────────────────────────────────
 
+interface Passenger { fullName: string; dodId: string }
+
+const MAX_EXTRA_PASSENGERS = 3   // riders 2, 3, 4 (car holds 5: driver + submitter + 3)
+
 interface FormValues {
   email: string
   fullName: string
@@ -147,6 +154,7 @@ interface FormValues {
   destination: string
   reason: string
   passengers: string
+  additionalPassengers: Passenger[]
   specialNotes: string
   agree: boolean[]
   signature: string
@@ -155,7 +163,7 @@ interface FormValues {
 const EMPTY: FormValues = {
   email: '', fullName: '', phone: '', riderType: '', dodId: '',
   rideDate: '', pickupTime: '', pickupLocation: '', destination: '',
-  reason: '', passengers: '', specialNotes: '',
+  reason: '', passengers: '', additionalPassengers: [], specialNotes: '',
   agree: [false, false, false], signature: '',
 }
 
@@ -168,6 +176,26 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
   const [submitting, setSubmitting] = useState(false)
 
   const set = (patch: Partial<FormValues>) => setForm(f => ({ ...f, ...patch }))
+
+  // Additional-passenger helpers (riders 2-4)
+  function setPassengers(v: string) {
+    if (v === 'Yes') {
+      set({ passengers: v, additionalPassengers: form.additionalPassengers.length ? form.additionalPassengers : [{ fullName: '', dodId: '' }] })
+    } else {
+      set({ passengers: v, additionalPassengers: [] })
+    }
+  }
+  function updatePassenger(i: number, patch: Partial<Passenger>) {
+    set({ additionalPassengers: form.additionalPassengers.map((p, idx) => idx === i ? { ...p, ...patch } : p) })
+  }
+  function addPassenger() {
+    if (form.additionalPassengers.length >= MAX_EXTRA_PASSENGERS) return
+    set({ additionalPassengers: [...form.additionalPassengers, { fullName: '', dodId: '' }] })
+  }
+  function removePassenger(i: number) {
+    const arr = form.additionalPassengers.filter((_, idx) => idx !== i)
+    set({ additionalPassengers: arr.length ? arr : [{ fullName: '', dodId: '' }] })
+  }
 
   // Reset after close
   useEffect(() => {
@@ -189,10 +217,10 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
   function validateStep(s: Step): string | null {
     if (s === 0) {
       if (!EMAIL_RE.test(form.email.trim())) return 'Please enter a valid email address.'
-      if (form.fullName.trim().length < 2) return 'Please enter your full name.'
-      if (form.phone.trim().length < 7) return 'Please enter a valid phone number.'
+      if (!NAME_RE.test(form.fullName.trim()) || form.fullName.trim().length < 2) return 'Please enter your real full name (letters only, no numbers).'
+      if (form.phone.replace(/\D/g, '').length < 10) return 'Please enter a valid phone number (at least 10 digits).'
       if (!form.riderType) return 'Please select whether you are a single soldier, military family, or other.'
-      if (!form.dodId.trim()) return 'Please enter your DoD ID number.'
+      if (!DOD_ID_RE.test(form.dodId.trim())) return 'Your DoD ID (DoDID/EDIPI) must be exactly 10 digits.'
     }
     if (s === 1) {
       if (!form.rideDate) return 'Please choose the date of your requested ride.'
@@ -202,6 +230,15 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
       if (!form.destination.trim()) return 'Please enter your destination.'
       if (!form.reason) return 'Please select a reason for transportation.'
       if (!form.passengers) return 'Please let us know if anyone else will be riding with you.'
+      if (form.passengers === 'Yes') {
+        if (form.additionalPassengers.length === 0) return 'Please add at least one passenger, or choose "No".'
+        if (form.additionalPassengers.length > MAX_EXTRA_PASSENGERS) return 'You can add at most 3 additional passengers.'
+        for (let i = 0; i < form.additionalPassengers.length; i++) {
+          const p = form.additionalPassengers[i]
+          if (!NAME_RE.test(p.fullName.trim()) || p.fullName.trim().length < 2) return `Please enter a real full name for passenger ${i + 2} (letters only).`
+          if (!DOD_ID_RE.test(p.dodId.trim())) return `Passenger ${i + 2}'s DoD ID must be exactly 10 digits.`
+        }
+      }
     }
     if (s === 2) {
       if (!form.agree.every(Boolean)) return 'Please acknowledge all parts of the transportation agreement.'
@@ -240,6 +277,9 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
       destination: form.destination.trim(),
       reason: form.reason,
       passengers: form.passengers,
+      additionalPassengers: form.passengers === 'Yes'
+        ? form.additionalPassengers.map(p => ({ fullName: p.fullName.trim(), dodId: p.dodId.trim() }))
+        : [],
       specialNotes: form.specialNotes.trim() || undefined,
       agreement: form.agree.every(Boolean),
       signature: form.signature.trim(),
@@ -290,8 +330,8 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
               <Field label="Are you" required>
                 <ChoiceGroup options={RIDER_TYPES} value={form.riderType} onChange={v => set({ riderType: v })} columns={2} />
               </Field>
-              <Field label="DoD ID Number (Full DODID)" required>
-                <input type="text" inputMode="numeric" value={form.dodId} onChange={e => set({ dodId: e.target.value })} placeholder="10-digit DoD ID" className={inputCls} />
+              <Field label="DoD ID Number (Full DODID)" required help="Your real 10-digit DoD ID / EDIPI — verified by a coordinator before pickup.">
+                <input type="text" inputMode="numeric" value={form.dodId} onChange={e => set({ dodId: onlyDigits(e.target.value, 10) })} placeholder="10-digit DoD ID" className={inputCls} />
               </Field>
             </div>
           )}
@@ -316,9 +356,54 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
               <Field label="Reason for Transportation" required>
                 <ChoiceGroup options={REASONS} value={form.reason} onChange={v => set({ reason: v })} columns={2} />
               </Field>
-              <Field label="Will anyone else be riding with you?" required help="Each passenger must submit their own request for safety and accountability.">
-                <ChoiceGroup options={['Yes', 'No']} value={form.passengers} onChange={v => set({ passengers: v })} columns={2} />
+              <Field label="Will anyone else be riding with you?" required help="You may add up to 3 more passengers (5 total in the vehicle, including the driver). Each needs their full name and DoD ID.">
+                <ChoiceGroup options={['Yes', 'No']} value={form.passengers} onChange={setPassengers} columns={2} />
               </Field>
+
+              {/* Additional passengers (riders 2-4) */}
+              {form.passengers === 'Yes' && (
+                <div className="space-y-3 rounded-sm border border-border bg-slate-50/60 p-4">
+                  {form.additionalPassengers.map((pax, i) => (
+                    <div key={i} className="rounded-sm border border-border bg-white p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-foreground">Passenger {i + 2}</span>
+                        <button type="button" onClick={() => removePassenger(i)} className="text-xs font-semibold text-red-500 hover:text-red-600">Remove</button>
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={pax.fullName}
+                          onChange={e => updatePassenger(i, { fullName: e.target.value })}
+                          placeholder={`Passenger ${i + 2} full name`}
+                          className={inputCls}
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={pax.dodId}
+                          onChange={e => updatePassenger(i, { dodId: onlyDigits(e.target.value, 10) })}
+                          placeholder={`Passenger ${i + 2} 10-digit DoD ID`}
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {form.additionalPassengers.length < MAX_EXTRA_PASSENGERS ? (
+                    <button
+                      type="button"
+                      onClick={addPassenger}
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold hover:text-gold-light"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+                      Add One More
+                    </button>
+                  ) : (
+                    <p className="text-xs text-muted">Maximum of 3 additional passengers reached (5 total including the driver).</p>
+                  )}
+                </div>
+              )}
+
               <Field label="Special Notes or Accommodations Needed">
                 <textarea rows={3} value={form.specialNotes} onChange={e => set({ specialNotes: e.target.value })} placeholder="e.g., wheelchair access, time constraints, car seat needed" className={`${inputCls} resize-none`} />
               </Field>

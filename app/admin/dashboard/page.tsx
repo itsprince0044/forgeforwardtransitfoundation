@@ -25,11 +25,21 @@ export default async function DashboardPage() {
 
   const role: Role = (profile?.role as Role) ?? 'master'
 
-  // All bookings with slot info
-  const { data: bookings } = await supabase
+  // All bookings with slot + additional-passenger info. Falls back to a plain
+  // query if the ride_passengers table hasn't been created yet, so the
+  // dashboard never goes blank.
+  let { data: bookings } = await supabase
     .from('bookings')
-    .select('*, slot:slots(date, time)')
+    .select('*, slot:slots(date, time), extra_passengers:ride_passengers(id, position, full_name, dod_id)')
     .order('created_at', { ascending: false })
+
+  if (!bookings) {
+    const fallback = await supabase
+      .from('bookings')
+      .select('*, slot:slots(date, time)')
+      .order('created_at', { ascending: false })
+    bookings = fallback.data
+  }
 
   // Admin list (master uses this; admins don't see this tab)
   const { data: barbers } = await supabase
