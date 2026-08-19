@@ -47,6 +47,12 @@ function formatTime(t: string): string {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DOD_ID_RE = /^\d{10}$/                       // DoD ID / EDIPI is exactly 10 digits
+
+// Rejects placeholder IDs like 0000000000 and straight runs like 1234567890.
+function isPlaceholderDodId(id: string): boolean {
+  if (/^(\d)\1{9}$/.test(id)) return true
+  return '01234567890123456789'.includes(id) || '98765432109876543210'.includes(id)
+}
 const NAME_RE = /^[A-Za-z][A-Za-z .'-]*$/          // must start with a letter; no numbers
 const onlyDigits = (v: string, max: number) => v.replace(/\D/g, '').slice(0, max)
 
@@ -221,6 +227,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
       if (form.phone.replace(/\D/g, '').length < 10) return 'Please enter a valid phone number (at least 10 digits).'
       if (!form.riderType) return 'Please select whether you are a single soldier, military family, or other.'
       if (!DOD_ID_RE.test(form.dodId.trim())) return 'Your DoD ID (DoDID/EDIPI) must be exactly 10 digits.'
+      if (isPlaceholderDodId(form.dodId.trim())) return 'Please enter your real DoD ID — placeholder numbers are not accepted.'
     }
     if (s === 1) {
       if (!form.rideDate) return 'Please choose the date of your requested ride.'
@@ -237,6 +244,7 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
           const p = form.additionalPassengers[i]
           if (!NAME_RE.test(p.fullName.trim()) || p.fullName.trim().length < 2) return `Please enter a real full name for passenger ${i + 2} (letters only).`
           if (!DOD_ID_RE.test(p.dodId.trim())) return `Passenger ${i + 2}'s DoD ID must be exactly 10 digits.`
+          if (isPlaceholderDodId(p.dodId.trim())) return `Please enter passenger ${i + 2}'s real DoD ID — placeholder numbers are not accepted.`
         }
       }
     }

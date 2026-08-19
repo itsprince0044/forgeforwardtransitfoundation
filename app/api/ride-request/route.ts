@@ -6,6 +6,15 @@ export const runtime = 'nodejs'
 
 const MAX_EXTRA_PASSENGERS = 3   // car holds 5: driver + submitter + up to 3
 const DOD_ID_RE = /^\d{10}$/
+
+// Rejects placeholder IDs like 0000000000 / 1111111111 and straight runs
+// such as 1234567890 — a real DoD ID (EDIPI) is never one of these.
+function isPlaceholderDodId(id: string): boolean {
+  if (/^(\d)\1{9}$/.test(id)) return true
+  const ascending = '01234567890123456789'
+  const descending = '98765432109876543210'
+  return ascending.includes(id) || descending.includes(id)
+}
 const NAME_RE = /^[A-Za-z][A-Za-z .'-]*$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -47,7 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 })
   if (phoneDigits.length < 10)
     return NextResponse.json({ error: 'A valid phone number is required.' }, { status: 400 })
-  if (!DOD_ID_RE.test(dodId))
+  if (!DOD_ID_RE.test(dodId) || isPlaceholderDodId(dodId))
     return NextResponse.json({ error: 'A valid 10-digit DoD ID is required.' }, { status: 400 })
   if (!body.reason?.trim())
     return NextResponse.json({ error: 'A reason for transportation is required.' }, { status: 400 })
@@ -63,7 +72,7 @@ export async function POST(req: Request) {
   for (const p of extraPassengers) {
     if (!NAME_RE.test(p.fullName) || p.fullName.length < 2)
       return NextResponse.json({ error: 'Each additional passenger needs a valid full name.' }, { status: 400 })
-    if (!DOD_ID_RE.test(p.dodId))
+    if (!DOD_ID_RE.test(p.dodId) || isPlaceholderDodId(p.dodId))
       return NextResponse.json({ error: 'Each additional passenger needs a valid 10-digit DoD ID.' }, { status: 400 })
   }
 
