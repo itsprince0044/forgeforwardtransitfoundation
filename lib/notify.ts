@@ -65,6 +65,14 @@ export function acceptToken(id: string): string {
 export function verifyAcceptToken(id: string, token: string): boolean {
   return !!token && token === acceptToken(id)
 }
+// Coordinators configured to receive ride-request notifications.
+export function coordinatorRecipients(): string[] {
+  return (process.env.COORDINATOR_EMAILS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+}
+
 function acceptUrl(id: string): string {
   return `${APP_URL}/api/ride-request/accept?id=${encodeURIComponent(id)}&token=${acceptToken(id)}`
 }
@@ -336,6 +344,25 @@ export async function notifyRideConfirmed(b: NotifyBooking): Promise<void> {
   if (b.phone) {
     tasks.push(sendSms({ to: b.phone, body: `Forge Forward: your ride for ${fmtTime(b.pickup_time)} on ${fmtDate(b.ride_date)} is CONFIRMED. A driver will call you shortly. Please be ready on time.` }))
   }
+  // Copy to the coordinator — their record of what they approved.
+  for (const to of coordinatorRecipients()) {
+    tasks.push(sendEmail({
+      to,
+      subject: `✅ You accepted — ${b.customer_name} (${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)})`,
+      html: shell({
+        eyebrow: 'Ride Accepted',
+        accent: C.green,
+        preheader: `You accepted ${b.customer_name}'s ride. Details for pickup.`,
+        heading: 'You accepted this ride',
+        bodyHtml:
+          p(`<strong>${b.customer_name}</strong> has been emailed that their ride is confirmed and that a driver will call them.`) +
+          detailsTable(b, true) +
+          passengersBlock(b) +
+          p(`<strong>Next step:</strong> call <a href="tel:${b.phone ?? ''}" style="color:${C.gold}">${b.phone ?? 'the rider'}</a> to arrange pickup details.`),
+      }),
+      text: `You accepted the ride for ${b.customer_name} on ${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)}. Pickup: ${b.pickup_location ?? '—'} -> ${b.destination ?? '—'}. Phone: ${b.phone ?? '—'}.`,
+    }))
+  }
   await Promise.allSettled(tasks)
 }
 
@@ -359,6 +386,23 @@ export async function notifyRideCancelled(b: NotifyBooking): Promise<void> {
   }
   if (b.phone) {
     tasks.push(sendSms({ to: b.phone, body: `Forge Forward: your ride request for ${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)} was cancelled. Please submit a new request or contact us.` }))
+  }
+  // Copy to the coordinator — their record of what they declined.
+  for (const to of coordinatorRecipients()) {
+    tasks.push(sendEmail({
+      to,
+      subject: `✕ You declined — ${b.customer_name} (${fmtDate(b.ride_date)})`,
+      html: shell({
+        eyebrow: 'Ride Declined',
+        accent: '#C0392B',
+        preheader: `You declined ${b.customer_name}'s ride request.`,
+        heading: 'You declined this request',
+        bodyHtml:
+          p(`<strong>${b.customer_name}</strong> has been emailed that this request could not be fulfilled, and invited to submit another.`) +
+          detailsTable(b, true),
+      }),
+      text: `You declined the ride request from ${b.customer_name} for ${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)}. The rider has been notified.`,
+    }))
   }
   await Promise.allSettled(tasks)
 }
