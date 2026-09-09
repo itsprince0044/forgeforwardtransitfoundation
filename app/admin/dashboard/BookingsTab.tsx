@@ -137,6 +137,17 @@ export default function BookingsTab({
     }
   }, [bookings, today])
 
+  // Rider history keyed by DoD ID — lets coordinators recognise returning
+  // riders and see how many rides that same person has requested before.
+  const rideCountByDodId = useMemo(() => {
+    const counts = new Map<string, number>()
+    bookings.forEach(b => {
+      const id = (b.dod_id ?? '').trim()
+      if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+    })
+    return counts
+  }, [bookings])
+
   const filtered = useMemo(() => {
     const list = filterDate ? bookings.filter(b => rideDateOf(b) === filterDate) : [...bookings]
     return list.sort((a, b) => {
@@ -300,8 +311,22 @@ export default function BookingsTab({
                           </button>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm font-semibold text-foreground">{booking.customer_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-foreground">{booking.customer_name}</p>
+                            {(() => {
+                              const rides = rideCountByDodId.get((booking.dod_id ?? '').trim()) ?? 0
+                              return rides > 1 ? (
+                                <span
+                                  className="shrink-0 text-[10px] font-bold uppercase tracking-wide bg-gold/10 text-gold border border-gold/30 px-1.5 py-0.5 rounded-sm"
+                                  title={`This DoD ID has ${rides} total ride requests`}
+                                >
+                                  Returning ×{rides}
+                                </span>
+                              ) : null
+                            })()}
+                          </div>
                           <p className="text-xs text-muted">{booking.phone}</p>
+                          {booking.dod_id && <p className="text-[11px] text-muted">DoD ID: {booking.dod_id}</p>}
                         </td>
                         <td className="px-4 py-4 text-sm text-foreground whitespace-nowrap">{booking.service}</td>
                         <td className="px-4 py-4 text-sm text-muted whitespace-nowrap">{d ? formatDate(d) : '—'}</td>

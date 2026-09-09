@@ -68,6 +68,9 @@ export function verifyAcceptToken(id: string, token: string): boolean {
 function acceptUrl(id: string): string {
   return `${APP_URL}/api/ride-request/accept?id=${encodeURIComponent(id)}&token=${acceptToken(id)}`
 }
+function declineUrl(id: string): string {
+  return `${APP_URL}/api/ride-request/decline?id=${encodeURIComponent(id)}&token=${acceptToken(id)}`
+}
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
@@ -231,6 +234,21 @@ function passengersBlock(b: NotifyBooking): string {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.border};border-radius:8px;overflow:hidden">${rows}</table>`
 }
 
+function twoButtons(
+  a: { href: string; label: string; color: string },
+  b: { href: string; label: string; color: string },
+): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px 0 4px"><tr>
+    <td style="border-radius:8px;background:${a.color};padding:0">
+      <a href="${a.href}" target="_blank" style="display:inline-block;padding:14px 26px;color:#fff;font-size:15px;font-weight:bold;text-decoration:none;border-radius:8px;letter-spacing:.3px">${a.label}</a>
+    </td>
+    <td style="width:12px"></td>
+    <td style="border-radius:8px;background:${b.color};padding:0">
+      <a href="${b.href}" target="_blank" style="display:inline-block;padding:14px 26px;color:#fff;font-size:15px;font-weight:bold;text-decoration:none;border-radius:8px;letter-spacing:.3px">${b.label}</a>
+    </td>
+  </tr></table>`
+}
+
 function button(href: string, label: string, color: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px"><tr>
     <td style="border-radius:8px;background:${color}">
@@ -278,17 +296,20 @@ export async function notifyCoordinators(b: NotifyBooking, recipients: string[])
     html: shell({
       eyebrow: 'Action Needed',
       accent: C.navy,
-      preheader: `${b.customer_name} requested a ride. Review and accept.`,
+      preheader: `${b.customer_name} requested a ride. Accept or decline.`,
       heading: 'New ride request',
       bodyHtml:
         p(`<strong>${b.customer_name}</strong> just submitted a ride request. Here are all the details from the form:`) +
         detailsTable(b, true) +
         passengersBlock(b) +
-        p('If everything looks good, accept the ride below — the rider will be notified automatically that a driver will call them.') +
-        button(acceptUrl(b.id), '✓ Accept This Ride', C.green) +
-        p(`<span style="color:${C.muted};font-size:12px">Or manage it anytime in the coordinator dashboard.</span>`),
+        p('Choose below — the rider is notified automatically either way.') +
+        twoButtons(
+          { href: acceptUrl(b.id), label: '✓ Accept Ride', color: C.green },
+          { href: declineUrl(b.id), label: '✕ Decline', color: '#C0392B' },
+        ) +
+        p(`<span style="color:${C.muted};font-size:12px">You can also manage this request anytime in the coordinator dashboard.</span>`),
     }),
-    text: `New ride request from ${b.customer_name} (${b.phone ?? 'no phone'}). ${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)}. ${b.pickup_location ?? '—'} -> ${b.destination ?? '—'}. Accept: ${acceptUrl(b.id)}`,
+    text: `New ride request from ${b.customer_name} (${b.phone ?? 'no phone'}). ${fmtDate(b.ride_date)} at ${fmtTime(b.pickup_time)}. ${b.pickup_location ?? '—'} -> ${b.destination ?? '—'}.\nAccept: ${acceptUrl(b.id)}\nDecline: ${declineUrl(b.id)}`,
   })
 }
 

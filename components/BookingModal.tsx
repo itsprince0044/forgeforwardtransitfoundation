@@ -246,6 +246,10 @@ export default function BookingModal({ isOpen, onClose }: { isOpen: boolean; onC
           if (!DOD_ID_RE.test(p.dodId.trim())) return `Passenger ${i + 2}'s DoD ID must be exactly 10 digits.`
           if (isPlaceholderDodId(p.dodId.trim())) return `Please enter passenger ${i + 2}'s real DoD ID — placeholder numbers are not accepted.`
         }
+        // Every rider on the request must be a different person.
+        const ids = [form.dodId.trim(), ...form.additionalPassengers.map(p => p.dodId.trim())]
+        if (new Set(ids).size !== ids.length)
+          return 'Each passenger must have a different DoD ID — the same ID cannot be used twice.'
       }
     }
     if (s === 2) {

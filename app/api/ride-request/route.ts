@@ -61,6 +61,39 @@ export async function POST(req: Request) {
   if (!body.reason?.trim())
     return NextResponse.json({ error: 'A reason for transportation is required.' }, { status: 400 })
 
+  // Pickup + destination must be real, non-empty addresses.
+  const pickupLocation = (body.pickupLocation ?? '').trim()
+  const destination = (body.destination ?? '').trim()
+  if (pickupLocation.length < 5)
+    return NextResponse.json({ error: 'A valid pickup location is required.' }, { status: 400 })
+  if (destination.length < 5)
+    return NextResponse.json({ error: 'A valid destination is required.' }, { status: 400 })
+
+  // Ride date must be a real date, today or later (no past bookings).
+  const rideDate = (body.rideDate ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rideDate) || Number.isNaN(Date.parse(rideDate)))
+    return NextResponse.json({ error: 'A valid ride date is required.' }, { status: 400 })
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  if (rideDate < todayKey)
+    return NextResponse.json({ error: 'The ride date cannot be in the past.' }, { status: 400 })
+
+  // Pickup time must be a real HH:MM value.
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test((body.pickupTime ?? '').trim()))
+    return NextResponse.json({ error: 'A valid pickup time is required.' }, { status: 400 })
+
+  // The transportation agreement must be accepted, and the electronic
+  // signature must match the requester's full name.
+  if (body.agreement !== true)
+    return NextResponse.json({ error: 'The transportation agreement must be accepted.' }, { status: 400 })
+  const signature = (body.signature ?? '').trim()
+  if (signature.toLowerCase() !== fullName.toLowerCase())
+    return NextResponse.json({ error: 'The electronic signature must match your full name.' }, { status: 400 })
+
+  // "Yes" to other riders means at least one passenger must be provided.
+  if (body.passengers === 'Yes' && !(Array.isArray(body.additionalPassengers) && body.additionalPassengers.length > 0))
+    return NextResponse.json({ error: 'Please provide details for each additional passenger.' }, { status: 400 })
+
   // Only keep complete extra passengers, and enforce the car-capacity cap.
   const extraPassengers = (Array.isArray(body.additionalPassengers) ? body.additionalPassengers : [])
     .map(p => ({ fullName: (p?.fullName ?? '').trim(), dodId: (p?.dodId ?? '').trim() }))
@@ -75,6 +108,11 @@ export async function POST(req: Request) {
     if (!DOD_ID_RE.test(p.dodId) || isPlaceholderDodId(p.dodId))
       return NextResponse.json({ error: 'Each additional passenger needs a valid 10-digit DoD ID.' }, { status: 400 })
   }
+
+  // No duplicate DoD IDs — each person rides once, and never twice on one request.
+  const allDodIds = [dodId, ...extraPassengers.map(p => p.dodId)]
+  if (new Set(allDodIds).size !== allDodIds.length)
+    return NextResponse.json({ error: 'Each passenger must have a different DoD ID.' }, { status: 400 })
 
   const supabase = createServiceClient()
 
